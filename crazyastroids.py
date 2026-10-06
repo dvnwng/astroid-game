@@ -7,6 +7,7 @@ pygame.init()
 
 WIDTH = 800
 HEIGHT = 600
+
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 clock = pygame.time.Clock()
 font = pygame.font.Font(None, 28)
@@ -15,6 +16,7 @@ big_font = pygame.font.Font(None, 80)
 THRUST = 0.15
 DRAG = 0.99
 MAX_SPEED = 7
+
 MAX_ASTEROIDS = 8
 MAX_ENEMIES = 2
 
@@ -50,6 +52,7 @@ class Ship:
         self.velocity = pygame.Vector2(0, 0)
         self.angle = 90
         self.radius = 15
+        self.immunity = 60
 
     def forward(self):
         radians = math.radians(self.angle)
@@ -80,12 +83,18 @@ class Ship:
 
         if self.pos.x > WIDTH:
             self.pos.x = 0
+
         if self.pos.x < 0:
             self.pos.x = WIDTH
+
         if self.pos.y > HEIGHT:
             self.pos.y = 0
+
         if self.pos.y < 0:
             self.pos.y = HEIGHT
+
+        if self.immunity > 0:
+            self.immunity -= 1
 
     def draw(self):
         forward = self.forward()
@@ -105,6 +114,7 @@ class Ship:
 class Enemy:
     def __init__(self, x, y):
         self.pos = pygame.Vector2(x, y)
+
         self.velocity = pygame.Vector2(1, 0).rotate(
             random.randint(0, 360)
         ) * random.uniform(1, 2.5)
@@ -132,6 +142,7 @@ class Enemy:
 
             if direction.length() > 0:
                 self.timer = 60
+
                 return Bullet(
                     self.pos.x,
                     self.pos.y,
@@ -202,9 +213,13 @@ asteroids = []
 for i in range(5):
     asteroids.append(make_asteroid())
 
+
 enemies = [make_enemy()]
 
-ship = Ship(WIDTH / 2, HEIGHT / 2)
+ship = Ship(
+    WIDTH / 2,
+    HEIGHT / 2
+)
 
 bullets = []
 enemy_bullets = []
@@ -230,6 +245,7 @@ while running:
                 running = False
 
             if event.key == pygame.K_SPACE and not game_over:
+
                 bullets.append(
                     Bullet(
                         ship.pos.x,
@@ -246,13 +262,17 @@ while running:
         asteroid_timer += 1
         enemy_timer += 1
 
+
         if asteroid_timer >= 120:
+
             asteroid_timer = 0
 
             if len(asteroids) < MAX_ASTEROIDS:
                 asteroids.append(make_asteroid())
 
+
         if enemy_timer >= 300:
+
             enemy_timer = 0
 
             if len(enemies) < MAX_ENEMIES:
@@ -260,17 +280,23 @@ while running:
 
 
         for asteroid in asteroids:
+
             asteroid.update()
 
-            if ship.pos.distance_to(asteroid.pos) < ship.radius + asteroid.radius:
-                game_over = True
+            if ship.immunity <= 0:
+
+                if ship.pos.distance_to(asteroid.pos) < ship.radius + asteroid.radius:
+                    game_over = True
 
 
         for enemy in enemies:
+
             enemy.update()
 
-            if ship.pos.distance_to(enemy.pos) < ship.radius + enemy.radius:
-                game_over = True
+            if ship.immunity <= 0:
+
+                if ship.pos.distance_to(enemy.pos) < ship.radius + enemy.radius:
+                    game_over = True
 
             shot = enemy.shoot(ship)
 
@@ -279,6 +305,7 @@ while running:
 
 
         for i in range(len(asteroids)):
+
             for j in range(i + 1, len(asteroids)):
 
                 a = asteroids[i]
@@ -290,24 +317,46 @@ while running:
                 if distance > 0 and distance < a.radius + b.radius:
 
                     normal = difference.normalize()
-                    speed = (b.velocity - a.velocity).dot(normal)
+
+                    speed = (
+                        b.velocity - a.velocity
+                    ).dot(normal)
 
                     if speed < 0:
-                        impulse = 2 * speed / (a.mass + b.mass)
 
-                        a.velocity += impulse * b.mass * normal
-                        b.velocity -= impulse * a.mass * normal
+                        impulse = (
+                            2 * speed
+                            / (a.mass + b.mass)
+                        )
+
+                        a.velocity += (
+                            impulse
+                            * b.mass
+                            * normal
+                        )
+
+                        b.velocity -= (
+                            impulse
+                            * a.mass
+                            * normal
+                        )
 
 
         for bullet in bullets[:]:
 
             bullet.update()
 
+
             for asteroid in asteroids[:]:
 
-                if bullet.pos.distance_to(asteroid.pos) < bullet.radius + asteroid.radius:
+                distance = bullet.pos.distance_to(
+                    asteroid.pos
+                )
+
+                if distance < bullet.radius + asteroid.radius:
 
                     rocks_hit += 1
+
                     old_radius = asteroid.radius
                     old_pos = asteroid.pos.copy()
 
@@ -315,6 +364,7 @@ while running:
 
                     if bullet in bullets:
                         bullets.remove(bullet)
+
 
                     if old_radius > 15:
 
@@ -347,10 +397,15 @@ while running:
 
                 for enemy in enemies[:]:
 
-                    if bullet.pos.distance_to(enemy.pos) < bullet.radius + enemy.radius:
+                    distance = bullet.pos.distance_to(
+                        enemy.pos
+                    )
+
+                    if distance < bullet.radius + enemy.radius:
 
                         enemies.remove(enemy)
                         bullets.remove(bullet)
+
                         break
 
 
@@ -362,11 +417,20 @@ while running:
 
             bullet.update()
 
-            if bullet.pos.distance_to(ship.pos) < bullet.radius + ship.radius:
+            distance = bullet.pos.distance_to(
+                ship.pos
+            )
+
+            if (
+                ship.immunity <= 0
+                and distance < bullet.radius + ship.radius
+            ):
+
                 game_over = True
                 enemy_bullets.remove(bullet)
 
             elif bullet.off_screen():
+
                 enemy_bullets.remove(bullet)
 
 
@@ -376,14 +440,18 @@ while running:
     for asteroid in asteroids:
         asteroid.draw()
 
+
     for enemy in enemies:
         enemy.draw()
+
 
     for bullet in bullets:
         bullet.draw((255, 100, 100))
 
+
     for bullet in enemy_bullets:
         bullet.draw((0, 255, 255))
+
 
     ship.draw()
 
@@ -396,14 +464,10 @@ while running:
             (255, 255, 255)
         )
 
-        velocity_text = font.render(
-            f"Velocity: ({ship.velocity.x:.2f}, {ship.velocity.y:.2f})",
-            True,
-            (255, 255, 255)
+        screen.blit(
+            rocks_text,
+            (10, 10)
         )
-
-        screen.blit(rocks_text, (10, 10))
-        screen.blit(velocity_text, (10, 40))
 
 
     else:
