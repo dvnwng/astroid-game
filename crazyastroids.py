@@ -1,7 +1,7 @@
 import pygame
 import random
-import sys
 import math
+import asyncio
 
 pygame.init()
 
@@ -186,8 +186,10 @@ class Bullet:
 
     def off_screen(self):
         return (
-            self.pos.x < 0 or self.pos.x > WIDTH
-            or self.pos.y < 0 or self.pos.y > HEIGHT
+            self.pos.x < 0
+            or self.pos.x > WIDTH
+            or self.pos.y < 0
+            or self.pos.y > HEIGHT
         )
 
 
@@ -208,302 +210,316 @@ def make_enemy():
     )
 
 
-asteroids = []
+async def main():
 
-for i in range(5):
-    asteroids.append(make_asteroid())
+    asteroids = []
+
+    for i in range(5):
+        asteroids.append(make_asteroid())
+
+    enemies = [make_enemy()]
+
+    ship = Ship(
+        WIDTH / 2,
+        HEIGHT / 2
+    )
+
+    bullets = []
+    enemy_bullets = []
+
+    rocks_hit = 0
+    asteroid_timer = 0
+    enemy_timer = 0
+
+    running = True
+    game_over = False
 
 
-enemies = [make_enemy()]
+    while running:
 
-ship = Ship(
-    WIDTH / 2,
-    HEIGHT / 2
-)
+        for event in pygame.event.get():
 
-bullets = []
-enemy_bullets = []
-
-rocks_hit = 0
-asteroid_timer = 0
-enemy_timer = 0
-
-running = True
-game_over = False
-
-
-while running:
-
-    for event in pygame.event.get():
-
-        if event.type == pygame.QUIT:
-            running = False
-
-        if event.type == pygame.KEYDOWN:
-
-            if event.key == pygame.K_ESCAPE:
+            if event.type == pygame.QUIT:
                 running = False
 
-            if event.key == pygame.K_SPACE and not game_over:
+            if event.type == pygame.KEYDOWN:
 
-                bullets.append(
-                    Bullet(
-                        ship.pos.x,
-                        ship.pos.y,
-                        ship.forward()
+                if event.key == pygame.K_ESCAPE:
+                    running = False
+
+                if event.key == pygame.K_SPACE and not game_over:
+
+                    bullets.append(
+                        Bullet(
+                            ship.pos.x,
+                            ship.pos.y,
+                            ship.forward()
+                        )
                     )
-                )
 
 
-    if not game_over:
+        if not game_over:
 
-        ship.update()
+            ship.update()
 
-        asteroid_timer += 1
-        enemy_timer += 1
-
-
-        if asteroid_timer >= 120:
-
-            asteroid_timer = 0
-
-            if len(asteroids) < MAX_ASTEROIDS:
-                asteroids.append(make_asteroid())
+            asteroid_timer += 1
+            enemy_timer += 1
 
 
-        if enemy_timer >= 300:
+            if asteroid_timer >= 120:
 
-            enemy_timer = 0
+                asteroid_timer = 0
 
-            if len(enemies) < MAX_ENEMIES:
-                enemies.append(make_enemy())
-
-
-        for asteroid in asteroids:
-
-            asteroid.update()
-
-            if ship.immunity <= 0:
-
-                if ship.pos.distance_to(asteroid.pos) < ship.radius + asteroid.radius:
-                    game_over = True
+                if len(asteroids) < MAX_ASTEROIDS:
+                    asteroids.append(make_asteroid())
 
 
-        for enemy in enemies:
+            if enemy_timer >= 300:
 
-            enemy.update()
+                enemy_timer = 0
 
-            if ship.immunity <= 0:
-
-                if ship.pos.distance_to(enemy.pos) < ship.radius + enemy.radius:
-                    game_over = True
-
-            shot = enemy.shoot(ship)
-
-            if shot:
-                enemy_bullets.append(shot)
+                if len(enemies) < MAX_ENEMIES:
+                    enemies.append(make_enemy())
 
 
-        for i in range(len(asteroids)):
+            for asteroid in asteroids:
 
-            for j in range(i + 1, len(asteroids)):
+                asteroid.update()
 
-                a = asteroids[i]
-                b = asteroids[j]
+                if ship.immunity <= 0:
 
-                difference = b.pos - a.pos
-                distance = difference.length()
+                    distance = ship.pos.distance_to(
+                        asteroid.pos
+                    )
 
-                if distance > 0 and distance < a.radius + b.radius:
-
-                    normal = difference.normalize()
-
-                    speed = (
-                        b.velocity - a.velocity
-                    ).dot(normal)
-
-                    if speed < 0:
-
-                        impulse = (
-                            2 * speed
-                            / (a.mass + b.mass)
-                        )
-
-                        a.velocity += (
-                            impulse
-                            * b.mass
-                            * normal
-                        )
-
-                        b.velocity -= (
-                            impulse
-                            * a.mass
-                            * normal
-                        )
+                    if distance < ship.radius + asteroid.radius:
+                        game_over = True
 
 
-        for bullet in bullets[:]:
+            for enemy in enemies:
 
-            bullet.update()
+                enemy.update()
 
+                if ship.immunity <= 0:
 
-            for asteroid in asteroids[:]:
-
-                distance = bullet.pos.distance_to(
-                    asteroid.pos
-                )
-
-                if distance < bullet.radius + asteroid.radius:
-
-                    rocks_hit += 1
-
-                    old_radius = asteroid.radius
-                    old_pos = asteroid.pos.copy()
-
-                    asteroids.remove(asteroid)
-
-                    if bullet in bullets:
-                        bullets.remove(bullet)
-
-
-                    if old_radius > 15:
-
-                        new_radius = old_radius // 2
-
-                        asteroids.append(
-                            Asteroid(
-                                old_pos.x + new_radius,
-                                old_pos.y,
-                                new_radius,
-                                3,
-                                random.randint(0, 360)
-                            )
-                        )
-
-                        asteroids.append(
-                            Asteroid(
-                                old_pos.x - new_radius,
-                                old_pos.y,
-                                new_radius,
-                                3,
-                                random.randint(0, 360)
-                            )
-                        )
-
-                    break
-
-
-            if bullet in bullets:
-
-                for enemy in enemies[:]:
-
-                    distance = bullet.pos.distance_to(
+                    distance = ship.pos.distance_to(
                         enemy.pos
                     )
 
-                    if distance < bullet.radius + enemy.radius:
+                    if distance < ship.radius + enemy.radius:
+                        game_over = True
 
-                        enemies.remove(enemy)
-                        bullets.remove(bullet)
+                shot = enemy.shoot(ship)
+
+                if shot:
+                    enemy_bullets.append(shot)
+
+
+            for i in range(len(asteroids)):
+
+                for j in range(i + 1, len(asteroids)):
+
+                    a = asteroids[i]
+                    b = asteroids[j]
+
+                    difference = b.pos - a.pos
+                    distance = difference.length()
+
+                    if distance > 0 and distance < a.radius + b.radius:
+
+                        normal = difference.normalize()
+
+                        speed = (
+                            b.velocity - a.velocity
+                        ).dot(normal)
+
+                        if speed < 0:
+
+                            impulse = (
+                                2 * speed
+                                / (a.mass + b.mass)
+                            )
+
+                            a.velocity += (
+                                impulse
+                                * b.mass
+                                * normal
+                            )
+
+                            b.velocity -= (
+                                impulse
+                                * a.mass
+                                * normal
+                            )
+
+
+            for bullet in bullets[:]:
+
+                bullet.update()
+
+
+                for asteroid in asteroids[:]:
+
+                    distance = bullet.pos.distance_to(
+                        asteroid.pos
+                    )
+
+                    if distance < bullet.radius + asteroid.radius:
+
+                        rocks_hit += 1
+
+                        old_radius = asteroid.radius
+                        old_pos = asteroid.pos.copy()
+
+                        asteroids.remove(asteroid)
+
+                        if bullet in bullets:
+                            bullets.remove(bullet)
+
+
+                        if old_radius > 15:
+
+                            new_radius = old_radius // 2
+
+                            asteroids.append(
+                                Asteroid(
+                                    old_pos.x + new_radius,
+                                    old_pos.y,
+                                    new_radius,
+                                    3,
+                                    random.randint(0, 360)
+                                )
+                            )
+
+                            asteroids.append(
+                                Asteroid(
+                                    old_pos.x - new_radius,
+                                    old_pos.y,
+                                    new_radius,
+                                    3,
+                                    random.randint(0, 360)
+                                )
+                            )
 
                         break
 
 
-            if bullet in bullets and bullet.off_screen():
-                bullets.remove(bullet)
+                if bullet in bullets:
+
+                    for enemy in enemies[:]:
+
+                        distance = bullet.pos.distance_to(
+                            enemy.pos
+                        )
+
+                        if distance < bullet.radius + enemy.radius:
+
+                            enemies.remove(enemy)
+                            bullets.remove(bullet)
+
+                            break
 
 
-        for bullet in enemy_bullets[:]:
+                if bullet in bullets and bullet.off_screen():
+                    bullets.remove(bullet)
 
-            bullet.update()
 
-            distance = bullet.pos.distance_to(
-                ship.pos
+            for bullet in enemy_bullets[:]:
+
+                bullet.update()
+
+                distance = bullet.pos.distance_to(
+                    ship.pos
+                )
+
+                if (
+                    ship.immunity <= 0
+                    and distance < bullet.radius + ship.radius
+                ):
+
+                    game_over = True
+                    enemy_bullets.remove(bullet)
+
+                elif bullet.off_screen():
+
+                    enemy_bullets.remove(bullet)
+
+
+        screen.fill((0, 0, 0))
+
+
+        for asteroid in asteroids:
+            asteroid.draw()
+
+
+        for enemy in enemies:
+            enemy.draw()
+
+
+        for bullet in bullets:
+            bullet.draw((255, 100, 100))
+
+
+        for bullet in enemy_bullets:
+            bullet.draw((0, 255, 255))
+
+
+        ship.draw()
+
+
+        if not game_over:
+
+            rocks_text = font.render(
+                f"Rocks Hit: {rocks_hit}",
+                True,
+                (255, 255, 255)
             )
 
-            if (
-                ship.immunity <= 0
-                and distance < bullet.radius + ship.radius
-            ):
-
-                game_over = True
-                enemy_bullets.remove(bullet)
-
-            elif bullet.off_screen():
-
-                enemy_bullets.remove(bullet)
-
-
-    screen.fill((0, 0, 0))
-
-
-    for asteroid in asteroids:
-        asteroid.draw()
-
-
-    for enemy in enemies:
-        enemy.draw()
-
-
-    for bullet in bullets:
-        bullet.draw((255, 100, 100))
-
-
-    for bullet in enemy_bullets:
-        bullet.draw((0, 255, 255))
-
-
-    ship.draw()
-
-
-    if not game_over:
-
-        rocks_text = font.render(
-            f"Rocks Hit: {rocks_hit}",
-            True,
-            (255, 255, 255)
-        )
-
-        screen.blit(
-            rocks_text,
-            (10, 10)
-        )
-
-
-    else:
-
-        lose_text = big_font.render(
-            "YOU LOSE",
-            True,
-            (255, 0, 0)
-        )
-
-        score_text = font.render(
-            f"Rocks Hit: {rocks_hit}",
-            True,
-            (255, 255, 255)
-        )
-
-        screen.blit(
-            lose_text,
-            (
-                WIDTH / 2 - lose_text.get_width() / 2,
-                HEIGHT / 2 - 50
+            screen.blit(
+                rocks_text,
+                (10, 10)
             )
-        )
 
-        screen.blit(
-            score_text,
-            (
-                WIDTH / 2 - score_text.get_width() / 2,
-                HEIGHT / 2 + 30
+
+        else:
+
+            lose_text = big_font.render(
+                "YOU LOSE",
+                True,
+                (255, 0, 0)
             )
-        )
+
+            score_text = font.render(
+                f"Rocks Hit: {rocks_hit}",
+                True,
+                (255, 255, 255)
+            )
+
+            screen.blit(
+                lose_text,
+                (
+                    WIDTH / 2 - lose_text.get_width() / 2,
+                    HEIGHT / 2 - 50
+                )
+            )
+
+            screen.blit(
+                score_text,
+                (
+                    WIDTH / 2 - score_text.get_width() / 2,
+                    HEIGHT / 2 + 30
+                )
+            )
 
 
-    pygame.display.flip()
-    clock.tick(60)
+        pygame.display.flip()
+
+        clock.tick(60)
+
+        await asyncio.sleep(0)
 
 
-pygame.quit()
-sys.exit()
+    pygame.quit()
+
+
+asyncio.run(main())
